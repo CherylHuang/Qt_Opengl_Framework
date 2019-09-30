@@ -1,2 +1,3 @@
 ﻿  Application.cpp
+e:\document\研究所\圖學\qt_opengl_framework\qt_opengl_framework\application.cpp(449): warning C4715: 'Application::FindClosestColor': 不是所有控制路徑都傳回值
   Qt_Opengl_Framework.vcxproj -> E:\Document\研究所\圖學\Qt_Opengl_Framework\x64\Release\Qt_Opengl_Framework.exe

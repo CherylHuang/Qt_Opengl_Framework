@@ -440,11 +440,66 @@ void Application::Dither_FS()
 //  Return success of operation.
 //
 ///////////////////////////////////////////////////////////////////////////////
+float Application::FindClosestColor(float pixel, int color)
+{
+	float RG[8] = { 0, 36, 73, 109, 146, 182, 219, 255 };
+	float B[4] = { 0, 85, 170, 255 };
+	if (color == rr || color == gg) return RG[(int)(pixel / (WHITE / 7.0f))];
+	else if (color == bb) return B[(int)(pixel / (WHITE / 3.0f))];
+}
 void Application::Dither_Color()
 {
 	unsigned char *rgb = this->To_RGB();
+	bool flag = true;
+	float **pixel;
+	pixel = new float*[img_height];
 
+	for (int i = 0; i < img_height; i++)
+	{
+		pixel[i] = new float[img_width * 3];
+		for (int j = 0; j < img_width; j+=3)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			for (int k = 0; k < 3; k++) pixel[i][j + k] = rgb[offset_rgb + k];
+		}
+	}
 
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = flag ? 0 : img_width - 3; j < img_width - 3 && j >= 0; j = flag ? j + 3 : j - 3)
+		{
+			for (int k = 0; k < 3; k++) {
+				float oldpixel = pixel[i][j + k];
+				float newpixel = FindClosestColor(oldpixel, k);
+				float quant_error = oldpixel - newpixel;
+				pixel[i][j + k] = newpixel;
+				if (j + 3 < img_width)
+					pixel[i][j + 3 + k] += 7.0f / 16.0f * quant_error;
+				if (i + 1 < img_height && j - 3 >= 0)
+					pixel[i + 1][j - 3 + k] += 3.0f / 16.0f * quant_error;
+				if (i + 1 < img_height)
+					pixel[i + 1][j + k] += 5.0f / 16.0f * quant_error;
+				if (i + 1 < img_height && j + 3 < img_width)
+					pixel[i + 1][j + 3 + k] += 1.0f / 16.0f * quant_error;
+			}
+		}
+		flag = flag ? false : true;
+	}
+
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j+=3)
+		{
+			int offset_rgba = i * img_width * 4 + j * 4;
+			for (int k = 0; k < 3; k++) {
+				img_data[offset_rgba + k] = pixel[i][j + k];
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
+
+	for (int i = 0; i < img_height; i++) delete[] pixel[i];
+	delete[] pixel;
 
 	delete[] rgb;
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );

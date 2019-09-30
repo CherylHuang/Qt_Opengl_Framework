@@ -38,6 +38,7 @@ public:
 	void Dither_Bright();
 	void Dither_Cluster();
 	void Dither_Color();
+	float FindClosestColor(float pixel, int color);
 
 	// Filter
 	void filtering(double filter[][5]);
