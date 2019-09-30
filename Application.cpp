@@ -1,6 +1,9 @@
 #include "Application.h"
 #include "qt_opengl_framework.h"
 #include <vector>
+#include <stdlib.h>
+
+float* Sorting(float ary[]);
 
 Application::Application()
 {
@@ -223,7 +226,21 @@ void Application::Dither_Threshold()
 {
 	unsigned char *rgb = this->To_RGB();
 
-
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			float gray = 0.3 * rgb[offset_rgb + rr] + 0.59 * rgb[offset_rgb + gg] + 0.11 * rgb[offset_rgb + bb];
+			float range = gray / WHITE;
+			for (int k = 0; k < 3; k++) {
+				if (range < 0.5)img_data[offset_rgba + k] = BLACK;
+				else img_data[offset_rgba + k] = WHITE;
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
 
 	delete[] rgb;
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
@@ -236,9 +253,26 @@ void Application::Dither_Threshold()
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Dither_Random()
 {
+	srand((unsigned)time(NULL));
+
 	unsigned char *rgb = this->To_RGB();
 
-
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			float gray = 0.3 * rgb[offset_rgb + rr] + 0.59 * rgb[offset_rgb + gg] + 0.11 * rgb[offset_rgb + bb];
+			float range = gray / WHITE;
+			range += -0.2f + (rand() % 5 / 10.f);
+			for (int k = 0; k < 3; k++) {
+				if (range < 0.5)img_data[offset_rgba + k] = BLACK;
+				else img_data[offset_rgba + k] = WHITE;
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
 
 	delete[] rgb;
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
@@ -252,10 +286,76 @@ void Application::Dither_Random()
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Dither_FS()
 {
+	this->Gray();
+
 	unsigned char *rgb = this->To_RGB();
+	int offset_rgb, offset_rgba;
+	bool flag = true;
+	//float **pixel;
+	//pixel = new float*[img_height];
 
+	//for (int i = 0; i < img_height; i++)
+	//{
+	//	pixel[i] = new float[img_width];
+	//	for (int j = 0; j < img_width; j++)
+	//	{
+	//		offset_rgb = i * img_width * 3 + j * 3;
+	//		float gray = 0.3 * rgb[offset_rgb + rr] + 0.59 * rgb[offset_rgb + gg] + 0.11 * rgb[offset_rgb + bb];
+	//		pixel[i][j] = gray;
+	//	}
+	//}
 
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = flag ? 0 : img_width - 1; j < img_width && j >= 0; j = flag ? j+1 : j-1)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			float oldpixel = rgb[offset_rgb + rr];
+			float newpixel = (oldpixel / 256) > 0.5 ? WHITE : BLACK;
+			//float oldpixel = pixel[i][j];
+			//float newpixel = (oldpixel / WHITE) < 0.5f ? BLACK : WHITE;
+			//float quant_error = oldpixel - newpixel;
+			//pixel[i][j] = newpixel;
+			for (int k = 0; k < 3; k++) {
+				img_data[offset_rgba + k] = newpixel;
+				float quant_error = oldpixel - newpixel;
+				//if (i + 1 < img_height)
+				if (j + 1 < img_width)
+					rgb[offset_rgb + 3 + k] += 7.0 / 16 * quant_error;
+					//pixel[i + 1][j] = pixel[i + 1][j] + 7.0f / 16.0f * quant_error;
+				//if (i - 1 >= 0 && j + 1 < img_width)
+				if (i + 1 < img_height && j - 1 > 0)
+					rgb[offset_rgb + 3 * img_width - 3 + k] += 3.0 / 16 * quant_error;
+					//pixel[i - 1][j + 1] = pixel[i - 1][j + 1] + 3.0f / 16.0f * quant_error;
+				//if (j + 1 < img_width)
+				if (i + 1 < img_height)
+					rgb[offset_rgb + 3 * img_width + k] += 5.0 / 16 * quant_error;
+					//pixel[i][j + 1] = pixel[i][j + 1] + 5.0f / 16.0f * quant_error;
+				//if (i + 1 < img_height && j + 1 < img_width)
+				if (i + 1 < img_height && j + 1 < img_width)
+					rgb[offset_rgb + 3 * img_width + 3 + k] += 1.0 / 16 * quant_error;
+					//pixel[i + 1][j + 1] = pixel[i + 1][j + 1] + 1.0f / 16.0f * quant_error;
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+		flag = flag ? false : true;
+	}
 
+	//for (int i = 0; i < img_height; i++)
+	//{
+	//	for (int j = 0; j < img_width; j++)
+	//	{
+	//		int offset_rgba = i * img_width * 4 + j * 4;
+	//		for (int k = 0; k < 3; k++) {
+	//			img_data[offset_rgba + k] = pixel[i][j];
+	//		}
+	//		img_data[offset_rgba + aa] = WHITE;
+	//	}
+	//}
+
+	//for (int i = 0; i < img_height; i++) delete[] pixel[i];
+	//delete[] pixel;
 	delete[] rgb;
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
 	renew();
@@ -269,9 +369,48 @@ void Application::Dither_FS()
 void Application::Dither_Bright()
 {
 	unsigned char *rgb = this->To_RGB();
+	int count = 0;
+	float sum, threshold, average;
+	sum = threshold = average = 0;
+	float *arySort;
+	float **aryGray;
+	arySort = new float[img_height * img_width];
+	aryGray = new float*[img_height];
 
-
-
+	for (int i = 0; i < img_height; i++)
+	{
+		aryGray[i] = new float[img_width];
+		for (int j = 0; j < img_width; j++)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			unsigned char gray = 0.3 * rgb[offset_rgb + rr] + 0.59 * rgb[offset_rgb + gg] + 0.11 * rgb[offset_rgb + bb];
+			float range = (float)gray / WHITE;
+			aryGray[i][j] = range;
+			arySort[count] = range;
+			count++;
+			sum += range;
+		}
+	}
+	average = sum / (img_height * img_width);
+	count = count * (1 - average);
+	arySort = Sorting(arySort);
+	threshold = arySort[count];
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int offset_rgba = i * img_width * 4 + j * 4;
+			for (int k = 0; k < 3; k++) {
+				if (aryGray[i][j] < threshold)img_data[offset_rgba + k] = BLACK;
+				//if (aryGray[i][j] < average)img_data[offset_rgba + k] = BLACK;
+				else img_data[offset_rgba + k] = WHITE;
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
+	delete[] arySort;
+	for (int i = 0; i < img_height; i++) delete[] aryGray[i];
+	delete[] aryGray;
 	delete[] rgb;
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
 	renew();
@@ -285,7 +424,29 @@ void Application::Dither_Cluster()
 {
 	unsigned char *rgb = this->To_RGB();
 
+	float ThresholdMatrix[4][4] = { 
+		{0.7059, 0.3529, 0.5882, 0.2353 },
+		{0.0588, 0.9412, 0.8235, 0.4118 },
+		{0.4706, 0.7647, 0.8824, 0.1176 },
+		{0.1765, 0.5294, 0.2941, 0.6471 },
+	};
 
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			float gray = 0.3 * rgb[offset_rgb + rr] + 0.59 * rgb[offset_rgb + gg] + 0.11 * rgb[offset_rgb + bb];
+			float range = gray / WHITE;
+			float threshold = ThresholdMatrix[i % 4][j % 4];
+			for (int k = 0; k < 3; k++) {
+				if (range < threshold)img_data[offset_rgba + k] = BLACK;
+				else img_data[offset_rgba + k] = WHITE;
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
 
 	delete[] rgb;
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
@@ -659,4 +820,19 @@ radius(iradius),x(ix),y(iy),r(ir),g(ig),b(ib),a(ia)
 }
 
 
-
+float* Sorting(float ary[])
+{
+	int iSwitch, size;
+	float temp;
+	size = sizeof(ary) / sizeof(ary[0]);
+	do {
+		iSwitch = 0;
+		for (int i = 0; i < size - 1; i++) {
+			if (ary[i] > ary[i + 1]) {
+				temp = ary[i]; ary[i] = ary[i + 1]; ary[i + 1] = temp;
+				iSwitch = 1;
+			}
+		}
+	} while (iSwitch);
+	return ary;
+}
