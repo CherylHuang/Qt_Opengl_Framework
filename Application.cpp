@@ -4,6 +4,8 @@
 #include <stdlib.h>
 
 float* Sorting(float ary[]);
+int FindMax(int ary[]);
+int BilinearInterpolation(int Q11, int Q12, int Q21, int Q22, int x1, int x2, int y1, int y2, double x, double y);
 
 Application::Application()
 {
@@ -207,8 +209,57 @@ void Application::Quant_Uniform()
 void Application::Quant_Populosity()
 {
 	unsigned char *rgb = this->To_RGB();
+	int ColorCount[32768] = { 0 };
+	int PopularColor[256] = { 0 };
 
-
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int r, g, b, color;
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			r = (rgb[offset_rgb + rr] >> 3) << 3;	// convert to 5 bit color
+			g = (rgb[offset_rgb + gg] >> 3) << 3;
+			b = (rgb[offset_rgb + bb] >> 3) << 3;
+			color = ((r >> 3) << 5 * rr) + ((g >> 3) << 5 * gg) + ((b >> 3) << 5 * bb);
+			ColorCount[color]++;
+		}
+	}
+	for (int i = 0; i < 256; i++)
+	{
+		int color = FindMax(ColorCount);
+		PopularColor[i] = color;
+		ColorCount[color] = 0;	// clear
+	}
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int r, g, b, minR, minG, minB;
+			minR = minG = minB = 0;
+			int MinColorDist = 999999999;
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			for (int k = 0; k < 256; k++)
+			{
+				r = (PopularColor[k] >> 5 * rr) << 3;
+				g = (PopularColor[k] >> 5 * gg) << 3;
+				b = (PopularColor[k] >> 5 * bb) << 3;
+				int ColorDist[3] = { r - rgb[offset_rgb + rr], g - rgb[offset_rgb + gg], b - rgb[offset_rgb + bb] };
+				int dist = ColorDist[0] * ColorDist[0] + ColorDist[1] * ColorDist[1] + ColorDist[2] * ColorDist[2];
+				if (MinColorDist > dist)
+				{
+					MinColorDist = dist;
+					minR = r; minG = g; minB = b;
+				}
+			}
+			img_data[offset_rgba + rr] = minR;
+			img_data[offset_rgba + gg] = minG;
+			img_data[offset_rgba + bb] = minB;
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
 
 	delete[] rgb;
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
@@ -541,7 +592,13 @@ void Application::filtering( double **filter, int n )
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Filter_Box()
 {
+	unsigned char *rgb = this->To_RGB();
 
+
+
+	delete[] rgb;
+	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32);
+	renew();
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -609,8 +666,7 @@ void Application::Filter_Enhance()
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Half_Size()
 {
-	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
-	renew();
+	this->Resize(0.5f);
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -619,8 +675,57 @@ void Application::Half_Size()
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Double_Size()
 {
-	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
+	this->Resize(2.0f);
+}
+///////////////////////////////////////////////////////////////////////////////
+//
+//  Scale the image dimensions by the given factor.  The given factor is 
+//	assumed to be greater than one.  Return success of operation.
+//
+///////////////////////////////////////////////////////////////////////////////
+void Application::Resize( float scale )
+{
+	unsigned char * rgb = To_RGB();
+
+	int newHeight = scale * img_height;
+	int newWidth = scale * img_width;
+	img_data = new unsigned char[newWidth * newHeight * 4];
+
+	for (int i = 0; i < newHeight; i++) {
+		for (int j = 0; j < newWidth; j++) {
+			float x = (float)img_height / newHeight * i;
+			float y = (float)img_width / newWidth * j;
+			int x1, x2, y1, y2;
+			x1 = (int)x;
+			x2 = (x1 >= img_height) ? x1 : (x1 + 1);
+			y1 = (int)y;
+			y2 = (y1 >= img_width) ? y1 : (y1 + 1);
+			int Q11, Q12, Q21, Q22;
+			Q11 = x1 * img_width * 3 + y1 * 3;
+			Q12 = x1 * img_width * 3 + y2 * 3;
+			Q21 = x2 * img_width * 3 + y1 * 3;
+			Q22 = x2 * img_width * 3 + y2 * 3;
+			int offset_rgba = i * newWidth * 4 + j * 4;
+			img_data[offset_rgba + rr] = BilinearInterpolation(rgb[Q11 + rr], rgb[Q12 + rr], rgb[Q21 + rr], rgb[Q22 + rr], x1, x2, y1, y2, x, y);
+			img_data[offset_rgba + gg] = BilinearInterpolation(rgb[Q11 + gg], rgb[Q12 + gg], rgb[Q21 + gg], rgb[Q22 + gg], x1, x2, y1, y2, x, y);
+			img_data[offset_rgba + bb] = BilinearInterpolation(rgb[Q11 + bb], rgb[Q12 + bb], rgb[Q21 + bb], rgb[Q22 + bb], x1, x2, y1, y2, x, y);
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
+
+	delete[] rgb;
+	this->img_height = newHeight;
+	this->img_width = newWidth;
+	this->mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32);
 	renew();
+}
+int BilinearInterpolation(int Q11, int Q12, int Q21, int Q22, int x1, int x2, int y1, int y2, double x, double y)
+{
+	float a0 = (float)x - x1;
+	float b0 = (float)y - y1;
+	float a1 = (float)x2 - x1;
+	float b1 = (float)y2 - y1;
+	return (int)((a1 - a0)*(b1 - b0)*Q11 + a0*(b1 - b0)*Q21 + b0*(a1 - a0)*Q12 + a0*b0*Q22) / (a1 * b1);
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -632,18 +737,6 @@ void Application::resample_src(int u, int v, float ww, unsigned char* rgba)
 
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//
-//  Scale the image dimensions by the given factor.  The given factor is 
-//	assumed to be greater than one.  Return success of operation.
-//
-///////////////////////////////////////////////////////////////////////////////
-void Application::Resize( float scale )
-{
-	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
-	renew();
-}
-
 //////////////////////////////////////////////////////////////////////////////
 //
 //  Rotate the image clockwise by the given angle.  Do not resize the 
@@ -652,6 +745,7 @@ void Application::Resize( float scale )
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Rotate( float angleDegrees )
 {
+
 	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
 	renew();
 }
@@ -871,4 +965,14 @@ float* Sorting(float ary[])
 		}
 	} while (iSwitch);
 	return ary;
+}
+
+int FindMax(int ary[])
+{
+	int size, max = 0;
+	size = sizeof(ary) / sizeof(ary[0]);
+	for (int i = 0; i < size; i++) {
+		if (ary[max] < ary[i]) max = i;
+	}
+	return max;
 }
