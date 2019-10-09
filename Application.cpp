@@ -243,9 +243,12 @@ void Application::Quant_Populosity()
 			int offset_rgba = i * img_width * 4 + j * 4;
 			for (int k = 0; k < 256; k++)
 			{
-				r = (PopularColor[k] >> 5 * rr) << 3;
-				g = (PopularColor[k] >> 5 * gg) << 3;
-				b = (PopularColor[k] >> 5 * bb) << 3;
+				//r = (PopularColor[k] >> 5 * rr) << 3;
+				//g = (PopularColor[k] >> 5 * gg) << 3;
+				//b = (PopularColor[k] >> 5 * bb) << 3;
+				r = ((PopularColor[k] & (0b11111 << 5 * rr)) >> 5 * rr) << 3;
+				g = ((PopularColor[k] & (0b11111 << 5 * gg)) >> 5 * gg) << 3;
+				b = ((PopularColor[k] & (0b11111 << 5 * bb)) >> 5 * bb) << 3;
 				int ColorDist[3] = { r - rgb[offset_rgb + rr], g - rgb[offset_rgb + gg], b - rgb[offset_rgb + bb] };
 				int dist = ColorDist[0] * ColorDist[0] + ColorDist[1] * ColorDist[1] + ColorDist[2] * ColorDist[2];
 				if (MinColorDist > dist)
@@ -692,7 +695,7 @@ void Application::Filter_Gaussian()
 //  operation.
 //
 ///////////////////////////////////////////////////////////////////////////////
-void Application::Filter_Gaussian_N( unsigned int N )
+void Application::Filter_Gaussian_N( int N )
 {
 	float **iPascal, **GaussianMatrix;
 	float *GaussianAry;
@@ -1071,7 +1074,7 @@ float* Sorting(float ary[])
 int FindMax(int ary[])
 {
 	int size, max = 0;
-	size = sizeof(ary) / sizeof(ary[0]);
+	size = 32 * 32 * 32;
 	for (int i = 0; i < size; i++) {
 		if (ary[max] < ary[i]) max = i;
 	}
