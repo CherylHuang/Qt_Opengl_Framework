@@ -3,7 +3,7 @@
 #include <vector>
 #include <stdlib.h>
 
-float* Sorting(float ary[]);
+float* Sorting(float ary[], int size);
 int FindMax(int ary[]);
 int BilinearInterpolation(int Q11, int Q12, int Q21, int Q22, int x1, int x2, int y1, int y2, double x, double y);
 
@@ -333,7 +333,7 @@ void Application::Dither_Bright()
 	}
 	average = sum / (img_height * img_width);
 	count = count * (1 - average);
-	arySort = Sorting(arySort);
+	arySort = Sorting(arySort, img_height * img_width);
 	threshold = arySort[count];
 	for (int i = 0; i < img_height; i++)
 	{
@@ -341,8 +341,8 @@ void Application::Dither_Bright()
 		{
 			int offset_rgba = i * img_width * 4 + j * 4;
 			for (int k = 0; k < 3; k++) {
-				//if (aryGray[i][j] < threshold)img_data[offset_rgba + k] = BLACK;
-				if (aryGray[i][j] < average)img_data[offset_rgba + k] = BLACK;
+				if (aryGray[i][j] < threshold)img_data[offset_rgba + k] = BLACK;
+				//if (aryGray[i][j] < average)img_data[offset_rgba + k] = BLACK;
 				else img_data[offset_rgba + k] = WHITE;
 			}
 			img_data[offset_rgba + aa] = WHITE;
@@ -1054,11 +1054,10 @@ radius(iradius),x(ix),y(iy),r(ir),g(ig),b(ib),a(ia)
 }
 
 
-float* Sorting(float ary[])
+float* Sorting(float ary[], int size)
 {
-	int iSwitch, size;
+	int iSwitch;
 	float temp;
-	size = sizeof(ary) / sizeof(ary[0]);
 	do {
 		iSwitch = 0;
 		for (int i = 0; i < size - 1; i++) {
