@@ -41,8 +41,10 @@ public:
 	float FindClosestColor(float pixel, int color);
 
 	// Filter
-	void filtering(double filter[][5]);
-	void filtering(double **filter, int n);
+	//void filtering(double filter[][5]);
+	int filtering(unsigned char * rgb, int startIndex, float **filter, int width, int height);
+	void Filter(float FilterData[]);
+	void Filter(float **FilterData, int n);
 	void Filter_Box();
 	void Filter_Bartlett();
 	void Filter_Gaussian();

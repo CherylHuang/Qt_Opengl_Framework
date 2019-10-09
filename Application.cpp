@@ -564,25 +564,75 @@ void Application::Dither_Color()
 //     Filtering the img_data array by the filter from the parameters
 //
 ///////////////////////////////////////////////////////////////////////////////
-void Application::filtering( double filter[][5] )
+int Application::filtering(unsigned char * rgb, int startIndex, float **filter, int width, int height)
+{
+	int Sum = 0, weight = 0;
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			int offset_rgb = startIndex + i * this->img_width * 3 + j * 3;
+			if (offset_rgb < 0 || offset_rgb > this->img_height * this->img_width * 3) {
+				Sum += 0;
+			}
+			else {
+				Sum += rgb[offset_rgb] * filter[i][j];
+			}
+			weight += filter[i][j];
+		}
+	}
+	return (int)(Sum / weight);
+}
+void Application::Filter(float FilterData[])
 {
 	unsigned char *rgb = this->To_RGB();
-
-
-
+	int FWidth = 5, FHeight = 5;
+	float **FilterMatrix;
+	FilterMatrix = new float*[FHeight];
+	for (int i = 0; i < FHeight; i++)
+	{
+		FilterMatrix[i] = new float[FWidth];
+		for (int j = 0; j < FWidth; j++)
+		{
+			FilterMatrix[i][j] = FilterData[i * FWidth + FWidth];
+		}
+	}
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			int startInx = offset_rgb - 2 * img_width * 3 + 2 * 3;
+			for (int k = 0; k < 3; k++) {
+				img_data[offset_rgba + k] = filtering(rgb, startInx + k, FilterMatrix, FWidth, FHeight);
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
+	for (int i = 0; i < FHeight; i++) delete[] FilterMatrix[i];
+	delete[] FilterMatrix;
 	delete[] rgb;
-	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
+	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32);
 	renew();
 }
-
-void Application::filtering( double **filter, int n )
+void Application::Filter(float **FilterData, int n)
 {
 	unsigned char *rgb = this->To_RGB();
-
-
-
+	int FWidth = n, FHeight = n;
+	for (int i = 0; i < img_height; i++)
+	{
+		for (int j = 0; j < img_width; j++)
+		{
+			int offset_rgb = i * img_width * 3 + j * 3;
+			int offset_rgba = i * img_width * 4 + j * 4;
+			int startInx = offset_rgb - ((int)(n / 2)) * img_width * 3 - ((int)(n / 2)) * 3;
+			for (int k = 0; k < 3; k++) {
+				img_data[offset_rgba + k] = filtering(rgb, startInx + k, FilterData, FWidth, FHeight);
+			}
+			img_data[offset_rgba + aa] = WHITE;
+		}
+	}
 	delete[] rgb;
-	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32 );
+	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32);
 	renew();
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -592,13 +642,14 @@ void Application::filtering( double **filter, int n )
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Filter_Box()
 {
-	unsigned char *rgb = this->To_RGB();
-
-
-
-	delete[] rgb;
-	mImageDst = QImage(img_data, img_width, img_height, QImage::Format_ARGB32);
-	renew();
+	float FilterData[25] = {
+		1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1
+	};
+	this->Filter(FilterData);
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -608,7 +659,14 @@ void Application::Filter_Box()
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Filter_Bartlett()
 {
-
+	float FilterData[25] = {
+		1, 2, 3, 2, 1,
+		2, 4, 6, 4, 2,
+		3, 6, 9, 6, 3,
+		2, 4, 6, 4, 2,
+		1, 2, 3, 2, 1
+	};
+	this->Filter(FilterData);
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -618,7 +676,15 @@ void Application::Filter_Bartlett()
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Filter_Gaussian()
 {
-
+	//float FilterData[25] = {
+	//	1, 4,  6,  4,  1,
+	//	4, 16, 24, 16, 4,
+	//	6, 24, 36, 24, 6,
+	//	4, 16, 24, 16, 4,
+	//	1, 4,  6,  4,  1,
+	//};
+	//this->Filter(FilterData);
+	this->Filter_Gaussian_N(5);
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -628,7 +694,42 @@ void Application::Filter_Gaussian()
 ///////////////////////////////////////////////////////////////////////////////
 void Application::Filter_Gaussian_N( unsigned int N )
 {
+	float **iPascal, **GaussianMatrix;
+	float *GaussianAry;
+	GaussianAry = new float[N];
+	iPascal = new float*[N];
+	GaussianMatrix = new float*[N];
+	for (int i = 0; i < N; i++) {
+		iPascal[i] = new float[N];
+		GaussianMatrix[i] = new float[N];
+	}
+	for (int i = 0; i < N; i++) { //Pascal init
+		iPascal[0][i] = 1;
+		iPascal[i][0] = 1;
+	}
+	for (int i = 1; i < N - 1; i++) { //complete Pascal
+		for (int j = 1; j < N - 1; j++) {
+			iPascal[i][j] = iPascal[i][j - 1] + iPascal[i - 1][j];
+		}
+	}
+	for (int i = 0; i < N; i++) GaussianAry[i] = iPascal[N - 1 - i][i];	//get the first line of GaussianMatrix
+	for (int i = 0; i < N; i++) {
+		GaussianMatrix[0][i] = GaussianAry[i];
+		for (int j = 1; j < N; j++) {
+			if (i > 0)
+				GaussianMatrix[i][j] = GaussianAry[j] * GaussianMatrix[0][i];
+		}
+	}
 
+	this->Filter(GaussianMatrix, N);	//call filter
+
+	delete[] GaussianAry;
+	for (int i = 0; i < N; i++) {
+		delete[] iPascal[i];
+		delete[] GaussianMatrix[i];
+	}
+	delete[] iPascal;
+	delete[] GaussianMatrix;
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
