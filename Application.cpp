@@ -717,10 +717,13 @@ void Application::Filter_Gaussian_N( int N )
 	}
 	for (int i = 0; i < N; i++) GaussianAry[i] = iPascal[N - 1 - i][i];	//get the first line of GaussianMatrix
 	for (int i = 0; i < N; i++) {
-		GaussianMatrix[0][i] = GaussianAry[i];
+		GaussianMatrix[0][i] = GaussianAry[i];	// put into first row
+		GaussianMatrix[i][0] = GaussianAry[i];	// put into first column
+	}
+	for (int i = 0; i < N; i++) {				// complete the GaussianMatrix
 		for (int j = 1; j < N; j++) {
 			if (i > 0)
-				GaussianMatrix[i][j] = GaussianAry[j] * GaussianMatrix[0][i];
+				GaussianMatrix[i][j] = GaussianMatrix[i][0] * GaussianMatrix[0][j];
 		}
 	}
 
@@ -1053,6 +1056,8 @@ radius(iradius),x(ix),y(iy),r(ir),g(ig),b(ib),a(ia)
 {
 }
 
+
+//---------------------Calculation-----------------------//
 
 float* Sorting(float ary[], int size)
 {
